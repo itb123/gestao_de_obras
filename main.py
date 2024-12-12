@@ -36,7 +36,7 @@ if file:
         try:
             # Loop para inserir cada linha no banco
             for i, row in df.iterrows():
-                if not registro_existe(Cliente, nota_ccs=row['nota_css']):
+                if not registro_existe(Cliente, nota_ccs=row['nota_ccs']):
                     cliente = Cliente(
                         nota_ccs=row['nota_ccs'],
                         status_ccs=row['status_ccs'],
@@ -55,7 +55,7 @@ if file:
                     )
                     session.add(cliente)  # Adicionar o objeto à sessão
                 else:
-                    st.info(f"Cliente já existe: Nota CSS {row['nota_css']}")
+                    st.info(f"Cliente já existe: Nota CCS {row['nota_ccs']}")
         except Exception as e:
             erros.append((i,e))
         try:
