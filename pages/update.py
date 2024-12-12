@@ -90,7 +90,8 @@ def atualizar_datas(df, tabela, campo_condicao):
         session.rollback()
 
 def atualizar_validacao(df,tabela,campo_condicao):
-    colunas_obrigatorias = ["nota_proj","parceira_validacao","data_envio_validacao","retorno_validacao","data_retorno_validacao"]
+    colunas_obrigatorias = ["nota_proj","parceira_validacao","data_envio_validacao",
+                            "retorno_validacao","data_retorno_validacao"]
     campos_presentes = [col for col in colunas_obrigatorias if col in df.columns]
     if not campos_presentes:
         st.error(f"O arquivo Excel deve conter pelo menos uma das colunas: {colunas_obrigatorias}")
@@ -183,35 +184,35 @@ elif aba == "Inserir PEP":
 
 elif aba == "Atualizar Datas":
     # Upload do arquivo Excel para atualização de datas
-    file = st.file_uploader("Selecione o arquivo Excel com as atualizações de datas", type=["xlsx"])
-    if file:
+    file3 = st.file_uploader("Selecione o arquivo Excel com as atualizações de datas", type=["xlsx"])
+    if file3:
         # Ler o arquivo Excel no DataFrame
-        df = pd.read_excel(file)
+        df3 = pd.read_excel(file3)
 
         # Pré-visualização
         st.write("Pré-visualização dos dados:")
-        st.dataframe(df.head())
+        st.dataframe(df3.head())
 
         # Verificar se a coluna de condição existe
-        if "pep" in df.columns:
+        if "pep" in df3.columns:
             if st.button("Atualizar Datas"):
-                atualizar_datas(df, Obra, "pep")
+                atualizar_datas(df3, Obra, "pep")
         else:
             st.error("O arquivo deve conter a coluna 'pep' para identificar os registros.")
 elif aba == "Validações":
     # Upload do arquivo Excel para atualização de datas
-    file = st.file_uploader("Selecione o arquivo Excel com as atualizações das validações", type=["xlsx"])
-    if file:
+    file4 = st.file_uploader("Selecione o arquivo Excel com as atualizações das validações", type=["xlsx"])
+    if file4:
         # Ler o arquivo Excel no DataFrame
-        df = pd.read_excel(file)
+        df4 = pd.read_excel(file4)
 
         # Pré-visualização
         st.write("Pré-visualização dos dados:")
-        st.dataframe(df.head())
-
+        st.dataframe(df4.head())
+        df4= df4.astype({"data_envio_validacao":"str","data_retorno_validacao":"str"})
         # Verificar se a coluna de condição existe
-        if "pep" in df.columns:
+        if "nota_proj" in df4.columns:
             if st.button("Atualizar Validações"):
-                atualizar_validacao(df, Obra, "nota_proj")
+                atualizar_validacao(df4, Obra, "nota_proj")
         else:
             st.error("O arquivo deve conter a coluna 'nota_proj' para identificar os registros.")
