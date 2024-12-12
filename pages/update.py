@@ -58,9 +58,9 @@ def atualizar_pep_ou_status(df, campo, valor, campo_condicao, tabela):
         session.rollback()
 
 def atualizar_datas(df, tabela, campo_condicao):
-    colunas_obrigatorias = ["data_criacao_pep", "data_aber_log", "data_lib_log", "data_lib_atec", "data_lib_ener"]
+    colunas_obrigatorias = ["pep","data_criacao_pep", "data_aber_log", "data_lib_log", "data_lib_atec", "data_lib_ener"]
+    df[colunas_obrigatorias] = df[colunas_obrigatorias].astype(str)
     campos_presentes = [col for col in colunas_obrigatorias if col in df.columns]
-
     if not campos_presentes:
         st.error(f"O arquivo Excel deve conter pelo menos uma das colunas: {colunas_obrigatorias}")
         return
@@ -90,9 +90,10 @@ def atualizar_datas(df, tabela, campo_condicao):
         session.rollback()
 
 def atualizar_validacao(df,tabela,campo_condicao):
-    colunas_obrigatorias = ["nota_proj","parceira_validacao","data_envio_validacao",
+    colunas_obrigatorias = ["pep","parceira_validacao","data_envio_validacao",
                             "retorno_validacao","data_retorno_validacao"]
     campos_presentes = [col for col in colunas_obrigatorias if col in df.columns]
+    df=df.astype({})
     if not campos_presentes:
         st.error(f"O arquivo Excel deve conter pelo menos uma das colunas: {colunas_obrigatorias}")
         return
@@ -125,8 +126,8 @@ def atualizar_validacao(df,tabela,campo_condicao):
 st.title("Atualização de Dados no Banco de Dados")
 
 # Abas para diferentes funcionalidades
-aba = st.radio("Selecione a função", ["Atualizar Status CCS", "Atualizar PEP", 
-                                      "Inserir PEP","Atualizar Datas"
+aba = st.radio("Selecione a função", ["Atualizar Status CCS", "Inserir PEP",
+                                      "Atualizar PEP","Atualizar Datas"
                                       ,"Validações"])
 
 if aba == "Atualizar Status CCS":

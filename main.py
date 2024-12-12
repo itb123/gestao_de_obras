@@ -20,7 +20,7 @@ if file:
     st.dataframe(df.head())
     #colunas obrigatorias
     colunas_clientes = [
-        'nota_css', 'status_ccs', 'projeto', 'data_solicitacao', 
+        'nota_ccs', 'status_ccs', 'projeto', 'data_solicitacao', 
         'data_aceite', 'cidade', 'prazo_nota', 'motivo_susp', 
         'reclamacao', 'ouvidoria','data_ligacao','status_projeto','motivo_expurgo',
         'dias_susp'
@@ -38,7 +38,7 @@ if file:
             for i, row in df.iterrows():
                 if not registro_existe(Cliente, nota_ccs=row['nota_css']):
                     cliente = Cliente(
-                        nota_ccs=row['nota_css'],
+                        nota_ccs=row['nota_ccs'],
                         status_ccs=row['status_ccs'],
                         projeto=row['projeto'],
                         status_projeto=row['status_projeto'],
@@ -147,7 +147,7 @@ if file3:
         if not validar_colunas(df3, colunas_obras):
             st.error("O arquivo não contém todas as colunas obrigatórias.")
         else:
-            if st.button("Salvar no Banco Projetos"):
+            if st.button("Salvar no Banco Programação"):
                 erros = []
                 for i, row in df3.iterrows():
                     try:
