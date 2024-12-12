@@ -31,7 +31,7 @@ class Obra(Base):
     data_lib_ener = Column("data_lib_ener",String,nullable=True)
     data_envio_validacao = Column("data_envio_validacao",String,nullable=True)
     parceira_validacao=Column("parceira_validacao",String,nullable=True)
-    retorno_validcao=Column("retorno_validacao",String,nullable=True)
+    retorno_validacao=Column("retorno_validacao",String,nullable=True)
     data_retorno_validacao = Column("data_retorno_validacao",String,nullable=True)
 
 
