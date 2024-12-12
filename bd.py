@@ -15,7 +15,7 @@ class Obra(Base):
     nota_proj = Column("nota_proj",String)
     pep = Column("pep",String,nullable=True)
     status_pep = Column("status_pep",String,nullable=True)
-    parceira = Column("parceira",String,nullable=True)
+    parceira_execucao = Column("parceira_execucao",String,nullable=True)
     descricao = Column("descricao",String)
     valor = Column("valor",Float)
     trafo = Column("trafo", Integer)

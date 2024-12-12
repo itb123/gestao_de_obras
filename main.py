@@ -77,7 +77,7 @@ if file2:
         st.dataframe(df2.head())
             # Botão para salvar os dados no banco de dados
         colunas_obras = [
-            'nota_proj', 'pep', 'status_pep', 'parceira', 'descricao',
+            'nota_proj', 'pep', 'status_pep', 'parceira_execucao', 'descricao',
             'valor', 'trafo', 'rede_mt', 'rede_bt', 'poste', 'tipo_de_obra', 
             'estudo_ambiental', 'data_criacao_pep', 'data_aber_log','data_lib_log',
             'data_lib_atec', 'data_lib_ener', 'data_envio_validacao', 
@@ -99,7 +99,7 @@ if file2:
                                 nota_proj=row['nota_proj'],
                                 pep=row['pep'],
                                 status_pep=row['status_pep'],
-                                parceira=row['parceira'],
+                                parceira_execucao=row['parceira_execucao'],
                                 descricao=row['descricao'],
                                 valor=row['valor'],
                                 trafo=row['trafo'],
