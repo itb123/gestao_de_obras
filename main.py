@@ -1,171 +1,157 @@
 import streamlit as st
 import pandas as pd
+from io import BytesIO
 from sqlalchemy.orm import sessionmaker
-from bd import Cliente, Obra,Programacao, session
+from bd import Cliente, Obra, Programacao, session
 
 st.write("Upload de arquivo para Banco de Dados")
-#funcao para verificar as colunas obrigatorias
-def validar_colunas(df,colunas_necessarias): 
+
+# Função para validar se as colunas necessárias estão presentes
+def validar_colunas(df, colunas_necessarias):
     return all(col in df.columns for col in colunas_necessarias)
+
 # Função para verificar se o registro já existe
 def registro_existe(model, **kwargs):
     return session.query(model).filter_by(**kwargs).first() is not None
-# Componente para upload de arquivo
-file = st.file_uploader("Arquivo Clientes", type=["xlsx"])
-if file:
-    # Ler o arquivo Excel no Pandas DataFrame
-    df = pd.read_excel(file)
-    st.write("Pré-visualização")
-    #exibir as 10 primeiras linhas
-    st.dataframe(df.head())
-    #colunas obrigatorias
+
+# Função para gerar o relatório Excel
+def gerar_relatorio_excel(registros_salvos, registros_nao_salvos):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        pd.DataFrame(registros_salvos).to_excel(writer, sheet_name='Registros Salvos', index=False)
+        pd.DataFrame(registros_nao_salvos).to_excel(writer, sheet_name='Registros Não Salvos', index=False)
+    output.seek(0)
+    return output
+
+# Função genérica para processar e salvar registros
+def processar_e_salvar(df, colunas_necessarias, modelo, campos_mapeados, chave_unica, nome_arquivo):
+    registros_salvos = []
+    registros_nao_salvos = []
+
+    # Validar colunas
+    if not validar_colunas(df, colunas_necessarias):
+        st.error(f"O arquivo não contém todas as colunas obrigatórias para {nome_arquivo}.")
+        return
+
+    # Loop para salvar os registros
+    for i, row in df.iterrows():
+        try:
+            if not registro_existe(modelo, **{chave_unica: row[chave_unica]}):
+                registro = modelo(**{campo: row[excel_coluna] for campo, excel_coluna in campos_mapeados.items()})
+                session.add(registro)
+                registros_salvos.append(row.to_dict())
+            else:
+                registros_nao_salvos.append({**row.to_dict(), "motivo": "Registro já existe no banco."})
+        except Exception as e:
+            registros_nao_salvos.append({**row.to_dict(), "motivo": f"Erro: {str(e)}"})
+
+    # Commit no banco de dados
+    try:
+        session.commit()
+        st.success(f"Processamento de {nome_arquivo} concluído!")
+    except Exception as e:
+        session.rollback()
+        st.error(f"Erro ao salvar os dados no banco para {nome_arquivo}: {str(e)}")
+        return
+
+    # Gerar relatório Excel
+    output = gerar_relatorio_excel(registros_salvos, registros_nao_salvos)
+    st.download_button(
+        label=f"Baixar relatório de {nome_arquivo}",
+        data=output,
+        file_name=f"relatorio_{nome_arquivo.lower()}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+# Processamento do arquivo de Clientes
+file_clientes = st.file_uploader("Arquivo Clientes", type=["xlsx"])
+if file_clientes:
+    df_clientes = pd.read_excel(file_clientes)
+    df_clientes = df_clientes.astype({'data_solicitacao': 'str', 'data_aceite': 'str', 'prazo_nota': 'str', 'data_ligacao': 'str'})
+    st.dataframe(df_clientes.head())
+
     colunas_clientes = [
         'nota_ccs', 'status_ccs', 'projeto', 'data_solicitacao', 
         'data_aceite', 'cidade', 'prazo_nota', 'motivo_susp', 
-        'reclamacao', 'ouvidoria','data_ligacao','status_projeto','motivo_expurgo',
-        'dias_susp'
-        ]
-    for _ in ['data_solicitacao','data_aceite','prazo_nota','data_ligacao']:
-        df  = df.astype({_:'str'})
-    #inova a funcao de validação de colunas e verificar com as colunas do arquivo
-    if not validar_colunas(df,colunas_clientes):
-        st.error("o arquivo não contém as colunas obrigatórias!")
-    # Botão para salvar os dados no banco de dados
-    elif st.button("Salvar no Banco Cliente"):
-        erros =[]
-        try:
-            # Loop para inserir cada linha no banco
-            for i, row in df.iterrows():
-                if not registro_existe(Cliente, nota_ccs=row['nota_ccs']):
-                    cliente = Cliente(
-                        nota_ccs=row['nota_ccs'],
-                        status_ccs=row['status_ccs'],
-                        projeto=row['projeto'],
-                        status_projeto=row['status_projeto'],
-                        data_solicitacao=row['data_solicitacao'],
-                        data_aceite=row['data_aceite'],
-                        data_ligacao=row['data_ligacao'],
-                        dias_susp=row['dias_susp'],
-                        cidade=row['cidade'],
-                        prazo_nota=row['prazo_nota'],
-                        motivo_susp=row['motivo_susp'],
-                        motivo_expurgo=row['motivo_expurgo'],
-                        reclamacao=row['reclamacao'],
-                        ouvidoria=row['ouvidoria']
-                    )
-                    session.add(cliente)  # Adicionar o objeto à sessão
-                else:
-                    st.info(f"Cliente já existe: Nota CCS {row['nota_ccs']}")
-        except Exception as e:
-            erros.append((i,e))
-        try:
-            session.commit()  # Confirmar as mudanças no banco
-            if erros:
-                st.warning(f"{len(erros)} registros falharam {erros}")
-            else:
-                st.success("Todos os dados de Clientes foram salvos com sucesso!")
-        except Exception as e:
-            session.rollback()
-            st.error(f"Erro ao salvar no banco: {str(e)}")
+        'reclamacao', 'ouvidoria', 'data_ligacao', 'status_projeto', 
+        'motivo_expurgo', 'dias_susp'
+    ]
+    campos_clientes = {
+        'nota_ccs': 'nota_ccs',
+        'status_ccs': 'status_ccs',
+        'projeto': 'projeto',
+        'data_solicitacao': 'data_solicitacao',
+        'data_aceite': 'data_aceite',
+        'cidade': 'cidade',
+        'prazo_nota': 'prazo_nota',
+        'motivo_susp': 'motivo_susp',
+        'reclamacao': 'reclamacao',
+        'ouvidoria': 'ouvidoria',
+        'data_ligacao': 'data_ligacao',
+        'status_projeto': 'status_projeto',
+        'motivo_expurgo': 'motivo_expurgo',
+        'dias_susp': 'dias_susp'
+    }
+    if st.button("Salvar Clientes"):
+        processar_e_salvar(df_clientes, colunas_clientes, Cliente, campos_clientes, 'nota_ccs', "Clientes")
 
-file2 = st.file_uploader("Arquivo Obras", type=["xlsx"])
+# Processamento do arquivo de Obras
+file_obras = st.file_uploader("Arquivo Obras", type=["xlsx"])
+if file_obras:
+    df_obras = pd.read_excel(file_obras)
+    df_obras = df_obras.astype({
+        'data_criacao_pep': 'str', 'data_aber_log': 'str', 
+        'data_lib_log': 'str', 'data_lib_atec': 'str', 
+        'data_lib_ener': 'str', 'data_envio_validacao': 'str', 
+        'data_retorno_validacao': 'str'
+    })
+    st.dataframe(df_obras.head())
 
-if file2:
-        # Ler o arquivo Excel no Pandas DataFrame
-        df2 = pd.read_excel(file2)
-        st.write("Pré-visualização")
-        st.dataframe(df2.head())
-            # Botão para salvar os dados no banco de dados
-        colunas_obras = [
-            'nota_proj', 'pep', 'status_pep', 'parceira_execucao', 'descricao',
-            'valor', 'trafo', 'rede_mt', 'rede_bt', 'poste', 'tipo_de_obra', 
-            'estudo_ambiental', 'data_criacao_pep', 'data_aber_log','data_lib_log',
-            'data_lib_atec', 'data_lib_ener', 'data_envio_validacao', 
-            'data_retorno_validacao','parceira_validacao','retorno_validacao'
-        ]
-        for _ in ['data_criacao_pep', 'data_aber_log','data_lib_log',
-            'data_lib_atec', 'data_lib_ener', 'data_envio_validacao', 
-            'data_retorno_validacao']:
-            df2 = df2.astype({_:'str'})           
-        if not validar_colunas(df2, colunas_obras):
-            st.error("O arquivo não contém todas as colunas obrigatórias.")
-        else:
-            if st.button("Salvar no Banco Projetos"):
-                erros = []
-                for i, row in df2.iterrows():
-                    if not registro_existe(Obra, nota_proj=row['nota_proj']):
-                        try:
-                            obra = Obra(
-                                nota_proj=row['nota_proj'],
-                                pep=row['pep'],
-                                status_pep=row['status_pep'],
-                                parceira_execucao=row['parceira_execucao'],
-                                descricao=row['descricao'],
-                                valor=row['valor'],
-                                trafo=row['trafo'],
-                                rede_mt=row['rede_mt'],
-                                rede_bt=row['rede_bt'],
-                                poste=row['poste'],
-                                tipo_de_obra=row['tipo_de_obra'],
-                                estudo_ambiental=row['estudo_ambiental'],
-                                data_criacao_pep = row['data_criacao_pep'],
-                                data_aber_log=row['data_aber_log'],
-                                data_lib_log=row['data_lib_log'],
-                                data_lib_atec=row['data_lib_atec'],
-                                data_lib_ener=row['data_lib_ener'],
-                                data_envio_validacao=row['data_envio_validacao'],
-                                data_retorno_validacao=row['data_retorno_validacao'],
-                                parceira_validacao=row['parceira_validacao'],
-                                retorno_validacao=row['retorno_validacao']
-                            )
-                            session.add(obra)  # Adicionar o objeto à sessão
-                        except Exception as e:
-                            erros.append((i, e))
-                    else:
-                        st.info(f"Obra já existe: Nota Projeto {row['nota_proj']}")
-                try:        
-                    session.commit()
-                    if erros:
-                        st.warning(f"{len(erros)} registros falharam: {erros}")
-                    else:
-                        st.success("Todos os dados de Obras foram salvos com sucesso!")
-                except Exception as e:
-                    session.rollback()
-                    st.error(f"Erro ao salvar no banco: {str(e)}")  
+    colunas_obras = [
+        'nota_proj', 'pep', 'status_pep', 'parceira_execucao', 'descricao',
+        'valor', 'trafo', 'rede_mt', 'rede_bt', 'poste', 'tipo_de_obra', 
+        'estudo_ambiental', 'data_criacao_pep', 'data_aber_log', 
+        'data_lib_log', 'data_lib_atec', 'data_lib_ener', 'data_envio_validacao', 
+        'data_retorno_validacao', 'parceira_validacao', 'retorno_validacao'
+    ]
+    campos_obras = {
+        'nota_proj': 'nota_proj',
+        'pep': 'pep',
+        'status_pep': 'status_pep',
+        'parceira_execucao': 'parceira_execucao',
+        'descricao': 'descricao',
+        'valor': 'valor',
+        'trafo': 'trafo',
+        'rede_mt': 'rede_mt',
+        'rede_bt': 'rede_bt',
+        'poste': 'poste',
+        'tipo_de_obra': 'tipo_de_obra',
+        'estudo_ambiental': 'estudo_ambiental',
+        'data_criacao_pep': 'data_criacao_pep',
+        'data_aber_log': 'data_aber_log',
+        'data_lib_log': 'data_lib_log',
+        'data_lib_atec': 'data_lib_atec',
+        'data_lib_ener': 'data_lib_ener',
+        'data_envio_validacao': 'data_envio_validacao',
+        'data_retorno_validacao': 'data_retorno_validacao',
+        'parceira_validacao': 'parceira_validacao',
+        'retorno_validacao': 'retorno_validacao'
+    }
+    if st.button("Salvar Obras"):
+        processar_e_salvar(df_obras, colunas_obras, Obra, campos_obras, 'nota_proj', "Obras")
 
-file3 = st.file_uploader("Arquivo Programação", type=["xlsx"])
-if file3:
-        # Ler o arquivo Excel no Pandas DataFrame
-        df3 = pd.read_excel(file3)
-        df3 = df3.astype({'nota_proj':'str'})
-        df3 = df3.astype({'retorno_programacao':'str'})
-        st.write("Pré-visualização")
-        st.dataframe(df3.head())
-        # Botão para salvar os dados no banco de dados
-        colunas_obras = ['nota_proj','data_programacao','retorno_programacao']
-        df3=df3.astype({'data_programacao':'str'})              
-        if not validar_colunas(df3, colunas_obras):
-            st.error("O arquivo não contém todas as colunas obrigatórias.")
-        else:
-            if st.button("Salvar no Banco Programação"):
-                erros = []
-                for i, row in df3.iterrows():
-                    try:
-                        programacao = Programacao(
-                            nota_proj=row['nota_proj'],
-                            data_programacao=row['data_programacao'],
-                            retorno_programacao=row['retorno_programacao']
-                        )
-                        session.add(programacao)  # Adicionar o objeto à sessão
-                    except Exception as e:
-                        erros.append((i, e))
-                try:
-                    session.commit()
-                    if erros:
-                        st.warning(f"{len(erros)} registros falharam ao serem inseridos.")
-                    else:
-                        st.success("Todos os dados de Obras foram salvos com sucesso!")
-                except Exception as e:
-                    session.rollback()  # Reverter a transação em caso de erro
-                    st.error(f"Erro ao salvar no banco: {str(e)}")
+# Processamento do arquivo de Programação
+file_programacao = st.file_uploader("Arquivo Programação", type=["xlsx"])
+if file_programacao:
+    df_programacao = pd.read_excel(file_programacao)
+    df_programacao = df_programacao.astype({'data_programacao': 'str', 'retorno_programacao': 'str'})
+    st.dataframe(df_programacao.head())
 
+    colunas_programacao = ['nota_proj', 'data_programacao', 'retorno_programacao']
+    campos_programacao = {
+        'nota_proj': 'nota_proj',
+        'data_programacao': 'data_programacao',
+        'retorno_programacao': 'retorno_programacao'
+    }
+    if st.button("Salvar Programação"):
+        processar_e_salvar(df_programacao, colunas_programacao, Programacao, campos_programacao, 'nota_proj', "Programação")
