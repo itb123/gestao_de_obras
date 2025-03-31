@@ -8,25 +8,41 @@ from bd import Cliente, Obra, session
 def atualizar_status_em_lote(df):
     erros = []
     registros_atualizados = 0
+
+    if df.empty:
+        return 0, ["O DataFrame está vazio."]
+
+    # Coletar todas as notas CCS em uma lista para uma única consulta
+    notas_ccs_lista = df['nota_ccs'].tolist()
+
+    # Buscar todos os clientes de uma vez para evitar múltiplas queries
+    clientes = session.query(Cliente).filter(Cliente.nota_ccs.in_(notas_ccs_lista)).all()
+    
+    # Criar um dicionário com nota_ccs como chave para acesso rápido
+    clientes_dict = {cliente.nota_ccs: cliente for cliente in clientes}
+
+    # Lista para atualização em massa
+    atualizacoes = []
+
     for _, row in df.iterrows():
         nota_ccs = row['nota_ccs']
         novo_status = row['status_ccs']
-        try:
-            # Localizar o cliente pelo `nota_ccs`
-            cliente = session.query(Cliente).filter_by(nota_ccs=nota_ccs).first()
-            if cliente:
-                cliente.status_ccs = novo_status  # Atualizar o status
-                registros_atualizados += 1
-            else:
-                erros.append(f"Nota CCS {nota_ccs} não encontrada.")
-        except Exception as e:
-            erros.append(f"Erro ao atualizar a Nota CCS {nota_ccs}: {str(e)}")
 
-    try:
-        session.commit()
-    except Exception as e:
-        session.rollback()
-        st.error(f"Erro ao salvar alterações no banco: {str(e)}")
+        if nota_ccs in clientes_dict:
+            atualizacoes.append({"id": clientes_dict[nota_ccs].id, "status_ccs": novo_status})
+            registros_atualizados += 1
+        else:
+            erros.append(f"Nota CCS {nota_ccs} não encontrada.")
+
+    # Se houver registros para atualizar, usar `bulk_update_mappings`
+    if atualizacoes:
+        try:
+            session.bulk_update_mappings(Cliente, atualizacoes)
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            st.error(f"Erro ao salvar alterações no banco: {str(e)}")
+            return 0, [str(e)]
 
     return registros_atualizados, erros
 
@@ -217,3 +233,21 @@ elif aba == "Validações":
                 atualizar_validacao(df4, Obra, "nota_proj")
         else:
             st.error("O arquivo deve conter a coluna 'nota_proj' para identificar os registros.")
+elif aba == "Parceira_validacao":
+    # Upload do arquivo Excel para atualização de datas
+    file5 = st.file_uploader("Selecione o arquivo Excel com as atualizações das parceiras para validações", type=["xlsx"])
+    '''
+    if file5:
+        # Ler o arquivo Excel no DataFrame
+        df5 = pd.read_excel(file5)
+        # Pré-visualização
+        st.write("Pré-visualização dos dados:")
+        st.dataframe(df5.head())
+        df5= df5.astype({"data_envio_validacao":"str"})
+        # Verificar se a coluna de condição existe
+        if "nota_proj" in df5.columns:
+            if st.button("Atualizar Validações"):
+                atualizar_validacao(df5, Obra, "nota_proj")
+        else:
+            st.error("O arquivo deve conter a coluna 'nota_proj' para identificar os registros.")
+    '''        
